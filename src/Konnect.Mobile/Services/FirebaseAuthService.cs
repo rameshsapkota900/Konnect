@@ -76,13 +76,19 @@ public class FirebaseAuthService : IFirebaseAuthService
     {
         try
         {
-            // Google sign-in requires platform-specific implementation
-            // For now, return error - implement with MAUI Essentials WebAuthenticator
-            return AuthResult.Fail("Google sign-in not yet implemented. Please use email/password.");
+            // Google sign-in on MAUI requires additional setup
+            // For now, guide users to use email/password
+            // To enable Google sign-in:
+            // 1. Configure OAuth consent screen in Google Cloud Console
+            // 2. Add SHA-1 fingerprint to Firebase
+            // 3. Enable Google sign-in in Firebase Authentication
+            
+            await Task.CompletedTask;
+            return AuthResult.Fail("Google sign-in requires additional setup. Please use email and password to sign in.");
         }
         catch (Exception ex)
         {
-            return AuthResult.Fail(ex.Message);
+            return AuthResult.Fail($"Google sign-in failed: {ex.Message}");
         }
     }
 

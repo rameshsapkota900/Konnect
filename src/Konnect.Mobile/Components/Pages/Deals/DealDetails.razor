@@ -1,0 +1,153 @@
+@page "/deals/{Id:guid}"
+@using Konnect.Mobile.Services
+@using Konnect.Shared.DTOs
+@using Konnect.Shared.Enums
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+
+<div class="header">
+    <button class="back-btn" @onclick="GoBack">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <h1 class="header-title">Deal Details</h1>
+</div>
+
+<div class="page-content">
+    @if (_isLoading)
+    {
+        <div class="loading">Loading...</div>
+    }
+    else if (_deal != null)
+    {
+        <div class="status-banner @GetStatusClass(_deal.Status)">
+            <span>@GetStatusText(_deal.Status)</span>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">@_deal.Campaign?.Title</h2>
+            <p class="card-desc">@_deal.Campaign?.Description</p>
+        </div>
+
+        <div class="card">
+            <h3 class="section-title">Deal Information</h3>
+            <div class="info-row"><span>Agreed Amount</span><span class="amount">Rs. @_deal.AgreedPrice.ToString("N0")</span></div>
+            <div class="info-row"><span>Created</span><span>@_deal.CreatedAt.ToString("MMM dd, yyyy")</span></div>
+            @if (_deal.CompletedAt.HasValue)
+            {
+                <div class="info-row"><span>Completed</span><span>@_deal.CompletedAt.Value.ToString("MMM dd, yyyy")</span></div>
+            }
+            @if (!string.IsNullOrEmpty(_deal.Notes))
+            {
+                <div class="notes"><strong>Notes:</strong> @_deal.Notes</div>
+            }
+        </div>
+
+        <div class="card">
+            <h3 class="section-title">@(_isBusiness ? "Creator" : "Business")</h3>
+            <div class="partner-info">
+                <div class="avatar">@((_isBusiness ? _deal.Creator?.FullName : _deal.Business?.FullName)?.FirstOrDefault())</div>
+                <div>
+                    <p class="partner-name">@(_isBusiness ? _deal.Creator?.FullName : _deal.Business?.FullName)</p>
+                    <p class="partner-email">@(_isBusiness ? _deal.Creator?.Email : _deal.Business?.Email)</p>
+                </div>
+            </div>
+            <button class="btn btn-outline btn-full" @onclick="OpenChat">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+                Message
+            </button>
+        </div>
+
+        @if (_deal.Status == DealStatus.Pending)
+        {
+            <div class="action-buttons">
+                <button class="btn btn-success btn-full" @onclick="AcceptDeal">Accept Deal</button>
+                <button class="btn btn-outline btn-full" @onclick="RejectDeal">Decline</button>
+            </div>
+        }
+        else if (_deal.Status == DealStatus.Accepted && !_isBusiness)
+        {
+            <button class="btn btn-primary btn-full" @onclick="StartWork">Start Working</button>
+        }
+        else if (_deal.Status == DealStatus.InProgress && !_isBusiness)
+        {
+            <button class="btn btn-primary btn-full" @onclick="SubmitContent">Submit Content</button>
+        }
+        else if (_deal.Status == DealStatus.ContentSubmitted && _isBusiness)
+        {
+            <div class="action-buttons">
+                <button class="btn btn-success btn-full" @onclick="ApprovePay">Approve & Pay</button>
+                <button class="btn btn-outline btn-full" @onclick="RequestRevision">Request Revision</button>
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .back-btn { background: none; border: none; padding: 8px; cursor: pointer; }
+    .status-banner { padding: 12px; text-align: center; border-radius: var(--radius); font-weight: 600; margin-bottom: 16px; }
+    .status-banner.pending { background: #FEF3C7; color: #D97706; }
+    .status-banner.active { background: #DBEAFE; color: #2563EB; }
+    .status-banner.completed { background: #D1FAE5; color: #059669; }
+    .status-banner.cancelled { background: #FEE2E2; color: #DC2626; }
+    
+    .card { background: white; border-radius: var(--radius); padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow); }
+    .card-title { font-size: 18px; font-weight: 600; margin: 0 0 8px 0; }
+    .card-desc { color: var(--text-secondary); margin: 0; font-size: 14px; }
+    .section-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin: 0 0 12px 0; text-transform: uppercase; }
+    
+    .info-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .info-row:last-of-type { border-bottom: none; }
+    .amount { font-weight: 700; color: var(--primary); font-size: 18px; }
+    .notes { margin-top: 12px; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-sm); font-size: 14px; }
+    
+    .partner-info { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .partner-name { font-weight: 600; margin: 0; }
+    .partner-email { color: var(--text-secondary); font-size: 14px; margin: 4px 0 0 0; }
+    
+    .action-buttons { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+    .btn-success { background: var(--success); color: white; }
+</style>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    
+    private DealDto? _deal;
+    private bool _isLoading = true;
+    private bool _isBusiness;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userResponse = await ApiService.GetCurrentUserAsync();
+        _isBusiness = userResponse.Data?.UserType == UserType.Business;
+        
+        var response = await ApiService.GetDealAsync(Id);
+        if (response.Success) _deal = response.Data;
+        _isLoading = false;
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/deals");
+    private void OpenChat() => Navigation.NavigateTo($"/chat/{_deal?.Id}");
+
+    private async Task AcceptDeal() => await UpdateStatus(DealStatus.Accepted);
+    private async Task RejectDeal() => await UpdateStatus(DealStatus.Cancelled);
+    private async Task StartWork() => await UpdateStatus(DealStatus.InProgress);
+    private async Task SubmitContent() => await UpdateStatus(DealStatus.ContentSubmitted);
+    private async Task RequestRevision() => await UpdateStatus(DealStatus.RevisionRequested);
+    private void ApprovePay() => Navigation.NavigateTo($"/payment/{_deal?.Id}");
+
+    private async Task UpdateStatus(DealStatus status)
+    {
+        var response = await ApiService.UpdateDealStatusAsync(Id, new UpdateDealStatusDto { Status = status });
+        if (response.Success) _deal = response.Data;
+    }
+
+    private static string GetStatusClass(DealStatus status) => status switch
+    {
+        DealStatus.Pending => "pending",
+        DealStatus.Accepted or DealStatus.InProgress or DealStatus.ContentSubmitted => "active",
+        DealStatus.Completed => "completed",
+        _ => "cancelled"
+    };
+
+    private static string GetStatusText(DealStatus status) => status.ToString();
+}

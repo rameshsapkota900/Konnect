@@ -1,0 +1,162 @@
+@page "/deals"
+@using Konnect.Mobile.Services
+@using Konnect.Shared.DTOs
+@using Konnect.Shared.Enums
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+
+<div class="header">
+    <h1 class="header-title">My Deals</h1>
+</div>
+
+<div class="page-content">
+    <div class="tabs">
+        <button class="tab @(_activeTab == "active" ? "active" : "")" @onclick='() => _activeTab = "active"'>Active</button>
+        <button class="tab @(_activeTab == "pending" ? "active" : "")" @onclick='() => _activeTab = "pending"'>Pending</button>
+        <button class="tab @(_activeTab == "completed" ? "active" : "")" @onclick='() => _activeTab = "completed"'>Completed</button>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="loading">Loading deals...</div>
+    }
+    else if (FilteredDeals.Any())
+    {
+        @foreach (var deal in FilteredDeals)
+        {
+            <div class="deal-card" @onclick="() => ViewDeal(deal.Id)">
+                <div class="deal-header">
+                    <h3 class="deal-title">@deal.Campaign?.Title</h3>
+                    <span class="deal-status @GetStatusClass(deal.Status)">@GetStatusText(deal.Status)</span>
+                </div>
+                <div class="deal-info">
+                    <div class="deal-row">
+                        <span class="label">Amount</span>
+                        <span class="value">Rs. @deal.AgreedPrice.ToString("N0")</span>
+                    </div>
+                    <div class="deal-row">
+                        <span class="label">Partner</span>
+                        <span class="value">@(deal.Creator?.FullName ?? deal.Business?.FullName)</span>
+                    </div>
+                    <div class="deal-row">
+                        <span class="label">Created</span>
+                        <span class="value">@deal.CreatedAt.ToString("MMM dd, yyyy")</span>
+                    </div>
+                </div>
+                @if (deal.Status == DealStatus.Pending)
+                {
+                    <div class="deal-actions">
+                        <button class="btn btn-success btn-sm" @onclick:stopPropagation @onclick="() => AcceptDeal(deal.Id)">Accept</button>
+                        <button class="btn btn-outline btn-sm" @onclick:stopPropagation @onclick="() => RejectDeal(deal.Id)">Decline</button>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="64" height="64">
+                <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
+            </svg>
+            <p>No @_activeTab deals yet</p>
+        </div>
+    }
+</div>
+
+<BottomNavigation UserType="@_userType" />
+
+<style>
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tab {
+        flex: 1; padding: 12px; border: none; background: white;
+        border-radius: var(--radius-sm); font-weight: 500; color: var(--text-secondary);
+        cursor: pointer; transition: all 0.2s;
+    }
+    .tab.active { background: var(--primary); color: white; }
+    
+    .deal-card {
+        background: white; border-radius: var(--radius); padding: 16px;
+        margin-bottom: 12px; box-shadow: var(--shadow); cursor: pointer;
+    }
+    .deal-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px; }
+    .deal-title { font-size: 16px; font-weight: 600; margin: 0; }
+    .deal-status {
+        font-size: 12px; padding: 4px 8px; border-radius: 12px; font-weight: 500;
+    }
+    .deal-status.pending { background: #FEF3C7; color: #D97706; }
+    .deal-status.active { background: #DBEAFE; color: #2563EB; }
+    .deal-status.completed { background: #D1FAE5; color: #059669; }
+    .deal-status.cancelled { background: #FEE2E2; color: #DC2626; }
+    
+    .deal-info { margin-bottom: 12px; }
+    .deal-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .deal-row:last-child { border-bottom: none; }
+    .label { color: var(--text-secondary); font-size: 14px; }
+    .value { font-weight: 500; font-size: 14px; }
+    
+    .deal-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .btn-sm { padding: 8px 16px; font-size: 14px; }
+    .btn-success { background: var(--success); color: white; border: none; border-radius: var(--radius-sm); cursor: pointer; }
+</style>
+
+@code {
+    private List<DealDto> _deals = new();
+    private bool _isLoading = true;
+    private string _activeTab = "active";
+    private UserType _userType = UserType.Creator;
+
+    private IEnumerable<DealDto> FilteredDeals => _activeTab switch
+    {
+        "pending" => _deals.Where(d => d.Status == DealStatus.Pending),
+        "completed" => _deals.Where(d => d.Status == DealStatus.Completed || d.Status == DealStatus.Cancelled),
+        _ => _deals.Where(d => d.Status == DealStatus.Accepted || d.Status == DealStatus.InProgress || d.Status == DealStatus.ContentSubmitted)
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userResponse = await ApiService.GetCurrentUserAsync();
+        if (userResponse.Success && userResponse.Data != null)
+            _userType = userResponse.Data.UserType;
+
+        var response = await ApiService.GetMyDealsAsync();
+        if (response.Success && response.Data != null)
+            _deals = response.Data;
+        _isLoading = false;
+    }
+
+    private void ViewDeal(Guid id) => Navigation.NavigateTo($"/deals/{id}");
+
+    private async Task AcceptDeal(Guid id)
+    {
+        await ApiService.UpdateDealStatusAsync(id, new UpdateDealStatusDto { Status = DealStatus.Accepted });
+        var response = await ApiService.GetMyDealsAsync();
+        if (response.Success && response.Data != null) _deals = response.Data;
+    }
+
+    private async Task RejectDeal(Guid id)
+    {
+        await ApiService.UpdateDealStatusAsync(id, new UpdateDealStatusDto { Status = DealStatus.Cancelled });
+        var response = await ApiService.GetMyDealsAsync();
+        if (response.Success && response.Data != null) _deals = response.Data;
+    }
+
+    private static string GetStatusClass(DealStatus status) => status switch
+    {
+        DealStatus.Pending => "pending",
+        DealStatus.Accepted or DealStatus.InProgress or DealStatus.ContentSubmitted => "active",
+        DealStatus.Completed => "completed",
+        _ => "cancelled"
+    };
+
+    private static string GetStatusText(DealStatus status) => status switch
+    {
+        DealStatus.Pending => "Pending",
+        DealStatus.Accepted => "Accepted",
+        DealStatus.InProgress => "In Progress",
+        DealStatus.ContentSubmitted => "Content Submitted",
+        DealStatus.Completed => "Completed",
+        DealStatus.Cancelled => "Cancelled",
+        _ => status.ToString()
+    };
+}

@@ -1,0 +1,188 @@
+@page "/campaign/{Id:guid}"
+@using Konnect.Mobile.Services
+@using Konnect.Shared.DTOs
+@using Konnect.Shared.Enums
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+
+<div class="header">
+    <button class="back-btn" @onclick="GoBack">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <h1 class="header-title">Campaign Details</h1>
+</div>
+
+<div class="page-content">
+    @if (_isLoading)
+    {
+        <div class="loading">Loading...</div>
+    }
+    else if (_campaign != null)
+    {
+        <div class="campaign-header">
+            <span class="niche-badge">@_campaign.Niche</span>
+            <span class="status-badge @GetStatusClass(_campaign.Status)">@_campaign.Status</span>
+        </div>
+
+        <h2 class="campaign-title">@_campaign.Title</h2>
+        <p class="campaign-desc">@_campaign.Description</p>
+
+        <div class="card">
+            <h3 class="section-title">Budget & Timeline</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Budget</span>
+                    <span class="info-value budget">Rs. @_campaign.Budget.ToString("N0")</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Deadline</span>
+                    <span class="info-value">@(_campaign.Deadline?.ToString("MMM dd, yyyy") ?? "Flexible")</span>
+                </div>
+            </div>
+        </div>
+
+        @if (_campaign.Deliverables?.Any() == true)
+        {
+            <div class="card">
+                <h3 class="section-title">Deliverables</h3>
+                <ul class="deliverables-list">
+                    @foreach (var item in _campaign.Deliverables)
+                    {
+                        <li>@item</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <div class="card">
+            <h3 class="section-title">Posted By</h3>
+            <div class="business-info">
+                <div class="avatar">@_campaign.Business?.FullName?.FirstOrDefault()</div>
+                <div>
+                    <p class="business-name">@_campaign.Business?.FullName</p>
+                    <p class="business-location">@_campaign.Business?.Location</p>
+                </div>
+            </div>
+        </div>
+
+        @if (_isCreator && _campaign.Status == CampaignStatus.Open)
+        {
+            <div class="apply-section">
+                @if (!_hasApplied)
+                {
+                    <div class="form-group">
+                        <label class="form-label">Your Proposed Rate (Rs.)</label>
+                        <input type="number" class="form-input" @bind="_proposedRate" placeholder="Enter your rate" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Message to Business</label>
+                        <textarea class="form-input" @bind="_proposalMessage" rows="3" placeholder="Why are you a good fit?"></textarea>
+                    </div>
+                    <button class="btn btn-primary btn-full" @onclick="ApplyToCampaign" disabled="@_isApplying">
+                        @(_isApplying ? "Applying..." : "Apply to Campaign")
+                    </button>
+                }
+                else
+                {
+                    <div class="applied-badge">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                        You've already applied to this campaign
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .back-btn { background: none; border: none; padding: 8px; cursor: pointer; }
+    
+    .campaign-header { display: flex; gap: 8px; margin-bottom: 12px; }
+    .niche-badge { background: var(--primary-light); color: var(--primary); padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 500; }
+    .status-badge { padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 500; }
+    .status-badge.open { background: #D1FAE5; color: #059669; }
+    .status-badge.inprogress { background: #DBEAFE; color: #2563EB; }
+    .status-badge.completed { background: #E5E7EB; color: #6B7280; }
+    
+    .campaign-title { font-size: 24px; font-weight: 700; margin: 0 0 12px 0; }
+    .campaign-desc { color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px; }
+    
+    .card { background: white; border-radius: var(--radius); padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow); }
+    .section-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin: 0 0 12px 0; text-transform: uppercase; }
+    
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .info-item { text-align: center; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-sm); }
+    .info-label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+    .info-value { font-weight: 600; font-size: 16px; }
+    .info-value.budget { color: var(--primary); font-size: 20px; }
+    
+    .deliverables-list { margin: 0; padding-left: 20px; }
+    .deliverables-list li { padding: 8px 0; color: var(--text-secondary); }
+    
+    .business-info { display: flex; align-items: center; gap: 12px; }
+    .business-name { font-weight: 600; margin: 0; }
+    .business-location { color: var(--text-secondary); font-size: 14px; margin: 4px 0 0 0; }
+    
+    .apply-section { background: white; border-radius: var(--radius); padding: 16px; margin-top: 16px; box-shadow: var(--shadow); }
+    .applied-badge { display: flex; align-items: center; gap: 8px; color: var(--success); font-weight: 500; justify-content: center; padding: 16px; }
+</style>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    
+    private CampaignDto? _campaign;
+    private bool _isLoading = true;
+    private bool _isCreator;
+    private bool _hasApplied;
+    private bool _isApplying;
+    private decimal _proposedRate;
+    private string _proposalMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userResponse = await ApiService.GetCurrentUserAsync();
+        _isCreator = userResponse.Data?.UserType == UserType.Creator;
+        
+        var response = await ApiService.GetCampaignAsync(Id);
+        if (response.Success)
+        {
+            _campaign = response.Data;
+            _proposedRate = _campaign?.Budget ?? 0;
+        }
+        
+        // Check if already applied
+        var dealsResponse = await ApiService.GetMyDealsAsync();
+        _hasApplied = dealsResponse.Data?.Any(d => d.CampaignId == Id) ?? false;
+        
+        _isLoading = false;
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/creator/campaigns");
+
+    private async Task ApplyToCampaign()
+    {
+        if (_proposedRate <= 0) return;
+        
+        _isApplying = true;
+        var response = await ApiService.CreateDealAsync(new CreateDealDto
+        {
+            CampaignId = Id,
+            CreatorId = Guid.Empty, // Will be set by backend from auth
+            AgreedPrice = _proposedRate,
+            Notes = _proposalMessage
+        });
+        
+        if (response.Success)
+        {
+            _hasApplied = true;
+        }
+        _isApplying = false;
+    }
+
+    private static string GetStatusClass(CampaignStatus status) => status switch
+    {
+        CampaignStatus.Open => "open",
+        CampaignStatus.InProgress => "inprogress",
+        _ => "completed"
+    };
+}

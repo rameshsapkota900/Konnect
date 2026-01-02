@@ -1,24 +1,43 @@
 @page "/creator/campaigns"
+@using Konnect.Mobile.Services
+@using Konnect.Shared.DTOs
+@using Konnect.Shared.Enums
 @inject IApiService ApiService
 @inject NavigationManager Navigation
 
 <div class="header">
     <h1 class="header-title">Browse Campaigns</h1>
+    <button class="header-action" @onclick="ToggleFilters">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
+    </button>
 </div>
 
 <div class="page-content">
-    <!-- Filters -->
+    @if (_showFilters)
+    {
+        <div class="filter-panel">
+            <div class="filter-row">
+                <label>Min Budget (Rs.)</label>
+                <input type="number" class="form-input" @bind="_filter.MinBudget" placeholder="0" />
+            </div>
+            <div class="filter-row">
+                <label>Max Budget (Rs.)</label>
+                <input type="number" class="form-input" @bind="_filter.MaxBudget" placeholder="Any" />
+            </div>
+            <button class="btn btn-primary btn-full" @onclick="ApplyFilters">Apply Filters</button>
+        </div>
+    }
+
     <div class="filter-chips">
+        <button class="chip @(_selectedNiche == null ? "active" : "")" @onclick="() => FilterByNiche(null)">All</button>
         @foreach (var niche in _niches)
         {
-            <button class="chip @(_selectedNiche == niche ? "active" : "")" 
-                    @onclick="() => FilterByNiche(niche)">
+            <button class="chip @(_selectedNiche == niche ? "active" : "")" @onclick="() => FilterByNiche(niche)">
                 @niche.ToString()
             </button>
         }
     </div>
 
-    <!-- Campaigns List -->
     @if (_isLoading)
     {
         <div class="loading">Loading campaigns...</div>
@@ -30,11 +49,11 @@
             <div class="card campaign-card" @onclick="() => ViewCampaign(campaign.Id)">
                 <div class="campaign-header">
                     <span class="tag">@campaign.Niche</span>
-                    <span class="campaign-budget">Rs @campaign.Budget</span>
+                    <span class="campaign-budget">Rs. @campaign.Budget.ToString("N0")</span>
                 </div>
                 
                 <h3 class="campaign-title">@campaign.Title</h3>
-                <p class="campaign-desc">@(campaign.Description.Length > 120 ? campaign.Description[..120] + "..." : campaign.Description)</p>
+                <p class="campaign-desc">@TruncateText(campaign.Description, 120)</p>
                 
                 <div class="campaign-meta">
                     <div class="business-info">
@@ -49,7 +68,7 @@
                     }
                 </div>
                 
-                @if (campaign.Deliverables.Any())
+                @if (campaign.Deliverables?.Any() == true)
                 {
                     <div class="deliverables">
                         <strong>Deliverables:</strong>
@@ -63,96 +82,62 @@
                 }
             </div>
         }
+        
+        @if (_hasMore)
+        {
+            <button class="btn btn-outline btn-full" @onclick="LoadMore">Load More</button>
+        }
     }
     else
     {
         <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="64" height="64">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+            </svg>
             <p>No campaigns found</p>
+            <p class="text-secondary">Try adjusting your filters</p>
         </div>
     }
 </div>
 
+<BottomNavigation UserType="UserType.Creator" />
+
 <style>
+    .header { display: flex; justify-content: space-between; align-items: center; }
+    .header-action { background: none; border: none; padding: 8px; cursor: pointer; color: var(--primary); }
+    
+    .filter-panel {
+        background: white; border-radius: var(--radius); padding: 16px;
+        margin-bottom: 16px; box-shadow: var(--shadow);
+    }
+    .filter-row { margin-bottom: 12px; }
+    .filter-row label { display: block; font-size: 14px; color: var(--text-secondary); margin-bottom: 4px; }
+    
     .filter-chips {
-        display: flex;
-        gap: 8px;
-        overflow-x: auto;
-        padding: 0 0 16px;
+        display: flex; gap: 8px; overflow-x: auto; padding: 0 0 16px;
         -webkit-overflow-scrolling: touch;
     }
-    
     .chip {
-        padding: 8px 16px;
-        border-radius: 20px;
-        border: 1px solid var(--border);
-        background: white;
-        font-size: 14px;
-        white-space: nowrap;
-        cursor: pointer;
+        padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border);
+        background: white; font-size: 14px; white-space: nowrap; cursor: pointer;
     }
+    .chip.active { background: var(--primary); color: white; border-color: var(--primary); }
     
-    .chip.active {
-        background: var(--primary);
-        color: white;
-        border-color: var(--primary);
-    }
-    
-    .campaign-card { cursor: pointer; }
-    
-    .campaign-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 12px;
-    }
-    
-    .campaign-budget {
-        font-size: 18px;
-        font-weight: 700;
-        color: var(--secondary);
-    }
-    
-    .campaign-title {
-        font-size: 18px;
-        margin-bottom: 8px;
-    }
-    
-    .campaign-desc {
-        color: var(--text-secondary);
-        font-size: 14px;
-        margin-bottom: 12px;
-    }
+    .campaign-card { cursor: pointer; margin-bottom: 12px; }
+    .campaign-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .campaign-budget { font-size: 18px; font-weight: 700; color: var(--secondary); }
+    .campaign-title { font-size: 18px; margin-bottom: 8px; }
+    .campaign-desc { color: var(--text-secondary); font-size: 14px; margin-bottom: 12px; line-height: 1.4; }
     
     .campaign-meta {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding-top: 12px;
-        border-top: 1px solid var(--border);
+        display: flex; justify-content: space-between; align-items: center;
+        padding-top: 12px; border-top: 1px solid var(--border);
     }
+    .business-info { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+    .deadline { color: var(--text-muted); font-size: 13px; }
     
-    .business-info {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 14px;
-    }
-    
-    .deadline {
-        color: var(--text-muted);
-        font-size: 13px;
-    }
-    
-    .deliverables {
-        margin-top: 12px;
-        font-size: 14px;
-        color: var(--text-secondary);
-    }
-    
-    .deliverables ul {
-        margin: 4px 0 0 20px;
-        padding: 0;
-    }
+    .deliverables { margin-top: 12px; font-size: 14px; color: var(--text-secondary); }
+    .deliverables ul { margin: 4px 0 0 20px; padding: 0; }
     
     .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
 </style>
@@ -161,38 +146,61 @@
     private List<CampaignDto> _campaigns = new();
     private Niche? _selectedNiche;
     private bool _isLoading = true;
-    private readonly Niche[] _niches = Enum.GetValues<Niche>().Take(8).ToArray();
+    private bool _showFilters;
+    private bool _hasMore;
+    private int _currentPage = 1;
+    private CampaignFilterDto _filter = new() { PageSize = 10 };
+    private readonly Niche[] _niches = Enum.GetValues<Niche>().Take(10).ToArray();
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadCampaigns();
-    }
+    protected override async Task OnInitializedAsync() => await LoadCampaigns();
 
     private async Task LoadCampaigns()
     {
         _isLoading = true;
-        var filter = new CampaignFilterDto
-        {
-            Niche = _selectedNiche,
-            PageSize = 20
-        };
+        _currentPage = 1;
+        _filter.Niche = _selectedNiche;
+        _filter.Page = _currentPage;
         
-        var result = await ApiService.GetCampaignsAsync(filter);
+        var result = await ApiService.GetCampaignsAsync(_filter);
         if (result.Success && result.Data != null)
         {
-            _campaigns = result.Data.Items;
+            _campaigns = result.Data.Items?.ToList() ?? new();
+            _hasMore = result.Data.HasNextPage;
         }
         _isLoading = false;
     }
 
-    private async Task FilterByNiche(Niche niche)
+    private async Task LoadMore()
     {
-        _selectedNiche = _selectedNiche == niche ? null : niche;
+        _currentPage++;
+        _filter.Page = _currentPage;
+        var result = await ApiService.GetCampaignsAsync(_filter);
+        if (result.Success && result.Data != null)
+        {
+            _campaigns.AddRange(result.Data.Items ?? new List<CampaignDto>());
+            _hasMore = result.Data.HasNextPage;
+        }
+    }
+
+    private void ToggleFilters() => _showFilters = !_showFilters;
+    
+    private async Task ApplyFilters()
+    {
+        _showFilters = false;
         await LoadCampaigns();
     }
 
-    private void ViewCampaign(Guid campaignId)
+    private async Task FilterByNiche(Niche? niche)
     {
-        Navigation.NavigateTo($"/campaigns/{campaignId}");
+        _selectedNiche = niche;
+        await LoadCampaigns();
+    }
+
+    private void ViewCampaign(Guid id) => Navigation.NavigateTo($"/campaign/{id}");
+
+    private static string TruncateText(string? text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        return text.Length <= maxLength ? text : text[..maxLength] + "...";
     }
 }

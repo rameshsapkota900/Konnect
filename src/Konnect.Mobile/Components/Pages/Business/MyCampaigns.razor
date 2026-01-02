@@ -1,0 +1,147 @@
+@page "/business/campaigns"
+@using Konnect.Mobile.Services
+@using Konnect.Shared.DTOs
+@using Konnect.Shared.Enums
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+
+<div class="header">
+    <h1 class="header-title">My Campaigns</h1>
+    <button class="header-action" @onclick="CreateNew">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+    </button>
+</div>
+
+<div class="page-content">
+    <div class="tabs">
+        <button class="tab @(_activeTab == "open" ? "active" : "")" @onclick='() => _activeTab = "open"'>Open</button>
+        <button class="tab @(_activeTab == "inprogress" ? "active" : "")" @onclick='() => _activeTab = "inprogress"'>In Progress</button>
+        <button class="tab @(_activeTab == "completed" ? "active" : "")" @onclick='() => _activeTab = "completed"'>Completed</button>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="loading">Loading campaigns...</div>
+    }
+    else if (FilteredCampaigns.Any())
+    {
+        @foreach (var campaign in FilteredCampaigns)
+        {
+            <div class="campaign-card" @onclick="() => ViewCampaign(campaign.Id)">
+                <div class="campaign-header">
+                    <span class="niche-badge">@campaign.Niche</span>
+                    <span class="status-badge @GetStatusClass(campaign.Status)">@campaign.Status</span>
+                </div>
+                <h3 class="campaign-title">@campaign.Title</h3>
+                <p class="campaign-desc">@TruncateText(campaign.Description, 100)</p>
+                <div class="campaign-footer">
+                    <span class="budget">Rs. @campaign.Budget.ToString("N0")</span>
+                    <span class="deadline">@(campaign.Deadline?.ToString("MMM dd") ?? "No deadline")</span>
+                </div>
+                <div class="campaign-actions">
+                    <button class="btn btn-sm btn-outline" @onclick:stopPropagation @onclick="() => EditCampaign(campaign.Id)">Edit</button>
+                    @if (campaign.Status == CampaignStatus.Open)
+                    {
+                        <button class="btn btn-sm btn-outline" @onclick:stopPropagation @onclick="() => CancelCampaign(campaign.Id)">Cancel</button>
+                    }
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="64" height="64">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+            </svg>
+            <p>No @_activeTab campaigns</p>
+            <button class="btn btn-primary" @onclick="CreateNew">Create Campaign</button>
+        </div>
+    }
+</div>
+
+<BottomNavigation UserType="UserType.Business" />
+
+<style>
+    .header { display: flex; justify-content: space-between; align-items: center; }
+    .header-action { background: none; border: none; padding: 8px; cursor: pointer; color: var(--primary); }
+    
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tab {
+        flex: 1; padding: 12px; border: none; background: white;
+        border-radius: var(--radius-sm); font-weight: 500; color: var(--text-secondary);
+        cursor: pointer; transition: all 0.2s;
+    }
+    .tab.active { background: var(--primary); color: white; }
+    
+    .campaign-card {
+        background: white; border-radius: var(--radius); padding: 16px;
+        margin-bottom: 12px; box-shadow: var(--shadow); cursor: pointer;
+    }
+    .campaign-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .niche-badge { background: var(--primary-light); color: var(--primary); padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+    .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+    .status-badge.open { background: #D1FAE5; color: #059669; }
+    .status-badge.inprogress { background: #DBEAFE; color: #2563EB; }
+    .status-badge.completed { background: #E5E7EB; color: #6B7280; }
+    
+    .campaign-title { font-size: 16px; font-weight: 600; margin: 0 0 8px 0; }
+    .campaign-desc { color: var(--text-secondary); font-size: 14px; margin: 0 0 12px 0; line-height: 1.4; }
+    
+    .campaign-footer { display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid var(--border); }
+    .budget { font-weight: 700; color: var(--primary); }
+    .deadline { color: var(--text-secondary); font-size: 14px; }
+    
+    .campaign-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .btn-sm { padding: 8px 16px; font-size: 13px; }
+</style>
+
+@code {
+    private List<CampaignDto> _campaigns = new();
+    private bool _isLoading = true;
+    private string _activeTab = "open";
+
+    private IEnumerable<CampaignDto> FilteredCampaigns => _activeTab switch
+    {
+        "inprogress" => _campaigns.Where(c => c.Status == CampaignStatus.InProgress),
+        "completed" => _campaigns.Where(c => c.Status == CampaignStatus.Completed || c.Status == CampaignStatus.Cancelled),
+        _ => _campaigns.Where(c => c.Status == CampaignStatus.Open || c.Status == CampaignStatus.Draft)
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCampaigns();
+    }
+
+    private async Task LoadCampaigns()
+    {
+        _isLoading = true;
+        var response = await ApiService.GetMyCampaignsAsync();
+        if (response.Success && response.Data != null)
+            _campaigns = response.Data;
+        _isLoading = false;
+    }
+
+    private void CreateNew() => Navigation.NavigateTo("/business/create-campaign");
+    private void ViewCampaign(Guid id) => Navigation.NavigateTo($"/campaign/{id}");
+    private void EditCampaign(Guid id) => Navigation.NavigateTo($"/business/edit-campaign/{id}");
+
+    private async Task CancelCampaign(Guid id)
+    {
+        await ApiService.UpdateCampaignAsync(id, new UpdateCampaignDto { Status = CampaignStatus.Cancelled });
+        await LoadCampaigns();
+    }
+
+    private static string GetStatusClass(CampaignStatus status) => status switch
+    {
+        CampaignStatus.Open => "open",
+        CampaignStatus.InProgress => "inprogress",
+        _ => "completed"
+    };
+
+    private static string TruncateText(string? text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        return text.Length <= maxLength ? text : text[..maxLength] + "...";
+    }
+}
