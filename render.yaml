@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: konnect-api
+    env: docker
+    dockerfilePath: ./src/Konnect.API/Dockerfile
+    dockerContext: ./src
+    plan: free
+    envVars:
+      - key: ASPNETCORE_URLS
+        value: http://+:80
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Firebase__ProjectId
+        value: konnect-2c9ba
