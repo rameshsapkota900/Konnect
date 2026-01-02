@@ -1,0 +1,143 @@
+@page "/chat"
+@inject IFirebaseChatService ChatService
+@inject IFirebaseAuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="header">
+    <h1 class="header-title">Messages</h1>
+</div>
+
+<div class="page-content">
+    @if (_isLoading)
+    {
+        <div class="loading">Loading chats...</div>
+    }
+    else if (_chats.Any())
+    {
+        @foreach (var chat in _chats)
+        {
+            <div class="chat-item" @onclick="() => OpenChat(chat.Id)">
+                <div class="avatar">
+                    @(GetOtherParticipantInitial(chat))
+                </div>
+                <div class="chat-info">
+                    <div class="chat-header">
+                        <span class="chat-name">@GetOtherParticipantName(chat)</span>
+                        <span class="chat-time">@FormatTime(chat.LastMessage?.Timestamp)</span>
+                    </div>
+                    <p class="chat-preview">
+                        @(chat.LastMessage?.Text ?? "No messages yet")
+                    </p>
+                </div>
+                @if (chat.UnreadCount > 0)
+                {
+                    <span class="unread-badge">@chat.UnreadCount</span>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="64" height="64">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+            </svg>
+            <p>No conversations yet</p>
+            <p class="text-secondary">Start a deal to begin chatting</p>
+        </div>
+    }
+</div>
+
+<style>
+    .chat-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        background: white;
+        border-radius: var(--radius);
+        margin-bottom: 8px;
+        cursor: pointer;
+        box-shadow: var(--shadow);
+    }
+    
+    .chat-info { flex: 1; min-width: 0; }
+    
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+    
+    .chat-name { font-weight: 600; }
+    .chat-time { font-size: 12px; color: var(--text-muted); }
+    
+    .chat-preview {
+        color: var(--text-secondary);
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .unread-badge {
+        background: var(--primary);
+        color: white;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 12px;
+        min-width: 24px;
+        text-align: center;
+    }
+    
+    .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+</style>
+
+@code {
+    private List<ChatRoom> _chats = new();
+    private bool _isLoading = true;
+    private string? _currentUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentUserId = AuthService.GetCurrentUserId();
+        if (!string.IsNullOrEmpty(_currentUserId))
+        {
+            _chats = await ChatService.GetUserChatsAsync(_currentUserId);
+        }
+        _isLoading = false;
+    }
+
+    private void OpenChat(string chatId)
+    {
+        Navigation.NavigateTo($"/chat/{chatId}");
+    }
+
+    private string GetOtherParticipantInitial(ChatRoom chat)
+    {
+        var otherId = chat.Participants.FirstOrDefault(p => p != _currentUserId);
+        return otherId?.FirstOrDefault().ToString().ToUpper() ?? "?";
+    }
+
+    private string GetOtherParticipantName(ChatRoom chat)
+    {
+        // In real app, you'd fetch user names
+        return "Chat Partner";
+    }
+
+    private static string FormatTime(DateTime? time)
+    {
+        if (!time.HasValue) return "";
+        var diff = DateTime.UtcNow - time.Value;
+        return diff.TotalDays switch
+        {
+            > 7 => time.Value.ToString("MMM dd"),
+            > 1 => $"{(int)diff.TotalDays}d",
+            _ when diff.TotalHours > 1 => $"{(int)diff.TotalHours}h",
+            _ when diff.TotalMinutes > 1 => $"{(int)diff.TotalMinutes}m",
+            _ => "now"
+        };
+    }
+}

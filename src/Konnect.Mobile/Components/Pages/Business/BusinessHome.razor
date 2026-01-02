@@ -1,0 +1,228 @@
+@page "/business/home"
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+
+<div class="header">
+    <h1 class="header-title">Find Creators</h1>
+</div>
+
+<div class="page-content">
+    <!-- Search & Filters -->
+    <div class="search-section">
+        <div class="search-bar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="var(--text-muted)">
+                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+            <input type="text" placeholder="Search creators..." @bind="_searchQuery" @bind:event="oninput" />
+        </div>
+        
+        <div class="filter-chips">
+            @foreach (var niche in _niches)
+            {
+                <button class="chip @(_selectedNiche == niche ? "active" : "")" 
+                        @onclick="() => FilterByNiche(niche)">
+                    @niche.ToString()
+                </button>
+            }
+        </div>
+    </div>
+
+    <!-- Creators List -->
+    @if (_isLoading)
+    {
+        <div class="loading">Loading creators...</div>
+    }
+    else if (_creators.Any())
+    {
+        @foreach (var creator in _creators)
+        {
+            <div class="card creator-card" @onclick="() => ViewCreator(creator.UserId)">
+                <div class="card-header">
+                    <div class="avatar">
+                        @if (!string.IsNullOrEmpty(creator.User?.ProfileImageUrl))
+                        {
+                            <img src="@creator.User.ProfileImageUrl" alt="@creator.User?.FullName" />
+                        }
+                        else
+                        {
+                            @(creator.User?.FullName?.FirstOrDefault())
+                        }
+                    </div>
+                    <div class="creator-info">
+                        <h3 class="card-title">@creator.User?.FullName</h3>
+                        <p class="card-subtitle">@creator.User?.Location</p>
+                    </div>
+                    @if (creator.IsVerified)
+                    {
+                        <span class="verified-badge">✓</span>
+                    }
+                </div>
+                
+                <p class="creator-bio">@(creator.Bio?.Length > 100 ? creator.Bio[..100] + "..." : creator.Bio)</p>
+                
+                <div class="creator-stats">
+                    <div class="stat">
+                        <span class="stat-value">@FormatNumber(creator.FollowersCount)</span>
+                        <span class="stat-label">Followers</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">@(creator.EngagementRate?.ToString("0.0"))%</span>
+                        <span class="stat-label">Engagement</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">Rs @creator.HourlyRate</span>
+                        <span class="stat-label">Rate</span>
+                    </div>
+                </div>
+                
+                <div class="creator-niches">
+                    @foreach (var niche in creator.Niches.Take(3))
+                    {
+                        <span class="tag tag-outline">@niche</span>
+                    }
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <p>No creators found</p>
+        </div>
+    }
+</div>
+
+<style>
+    .search-section { margin-bottom: 16px; }
+    
+    .search-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: white;
+        padding: 12px 16px;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+    }
+    
+    .search-bar input {
+        flex: 1;
+        border: none;
+        outline: none;
+        font-size: 16px;
+    }
+    
+    .filter-chips {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 12px 0;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .chip {
+        padding: 8px 16px;
+        border-radius: 20px;
+        border: 1px solid var(--border);
+        background: white;
+        font-size: 14px;
+        white-space: nowrap;
+        cursor: pointer;
+    }
+    
+    .chip.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+    
+    .creator-card { cursor: pointer; }
+    
+    .creator-info { flex: 1; }
+    
+    .verified-badge {
+        background: var(--secondary);
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+    }
+    
+    .creator-bio {
+        color: var(--text-secondary);
+        font-size: 14px;
+        margin-bottom: 12px;
+    }
+    
+    .creator-stats {
+        display: flex;
+        justify-content: space-around;
+        padding: 12px 0;
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 12px;
+    }
+    
+    .stat { text-align: center; }
+    .stat-value { font-weight: 600; color: var(--primary); }
+    .stat-label { font-size: 12px; color: var(--text-muted); display: block; }
+    
+    .creator-niches { display: flex; gap: 8px; flex-wrap: wrap; }
+    
+    .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+</style>
+
+@code {
+    private List<CreatorProfileDto> _creators = new();
+    private string _searchQuery = "";
+    private Niche? _selectedNiche;
+    private bool _isLoading = true;
+    private readonly Niche[] _niches = Enum.GetValues<Niche>().Take(8).ToArray();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCreators();
+    }
+
+    private async Task LoadCreators()
+    {
+        _isLoading = true;
+        var filter = new CreatorFilterDto
+        {
+            Niche = _selectedNiche,
+            PageSize = 20
+        };
+        
+        var result = await ApiService.SearchCreatorsAsync(filter);
+        if (result.Success && result.Data != null)
+        {
+            _creators = result.Data.Items;
+        }
+        _isLoading = false;
+    }
+
+    private async Task FilterByNiche(Niche niche)
+    {
+        _selectedNiche = _selectedNiche == niche ? null : niche;
+        await LoadCreators();
+    }
+
+    private void ViewCreator(Guid userId)
+    {
+        Navigation.NavigateTo($"/creator/{userId}");
+    }
+
+    private static string FormatNumber(int num)
+    {
+        return num switch
+        {
+            >= 1000000 => $"{num / 1000000.0:0.#}M",
+            >= 1000 => $"{num / 1000.0:0.#}K",
+            _ => num.ToString()
+        };
+    }
+}

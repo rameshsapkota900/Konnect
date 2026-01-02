@@ -1,0 +1,229 @@
+@page "/onboarding"
+@inject IFirebaseAuthService AuthService
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+
+<div class="page onboarding-page">
+    <div class="onboarding-container">
+        <h1 class="onboarding-title">Welcome to Konnect!</h1>
+        <p class="onboarding-subtitle">Tell us about yourself</p>
+
+        <div class="user-type-selection">
+            <div class="type-card @(_selectedType == UserType.Business ? "selected" : "")" 
+                 @onclick="() => SelectType(UserType.Business)">
+                <div class="type-icon business">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="40" height="40">
+                        <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
+                    </svg>
+                </div>
+                <h3>I'm a Business</h3>
+                <p>Looking for creators to promote my brand</p>
+            </div>
+
+            <div class="type-card @(_selectedType == UserType.Creator ? "selected" : "")" 
+                 @onclick="() => SelectType(UserType.Creator)">
+                <div class="type-icon creator">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="40" height="40">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                </div>
+                <h3>I'm a Creator</h3>
+                <p>Looking for brand deals and collaborations</p>
+            </div>
+        </div>
+
+        @if (_selectedType.HasValue)
+        {
+            <div class="profile-form">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" class="form-input" @bind="_fullName" placeholder="Your name" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Location</label>
+                    <input type="text" class="form-input" @bind="_location" placeholder="e.g., Kathmandu, Nepal" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Phone (Optional)</label>
+                    <input type="tel" class="form-input" @bind="_phone" placeholder="+977 98XXXXXXXX" />
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-error">@_errorMessage</div>
+        }
+
+        <button class="btn btn-primary btn-full mt-2" 
+                disabled="@(!_selectedType.HasValue || _isLoading)"
+                @onclick="HandleContinue">
+            @if (_isLoading)
+            {
+                <span>Setting up...</span>
+            }
+            else
+            {
+                <span>Continue</span>
+            }
+        </button>
+    </div>
+</div>
+
+<style>
+    .onboarding-page {
+        min-height: 100vh;
+        padding: 24px;
+        background: linear-gradient(180deg, #F9FAFB 0%, #EEF2FF 100%);
+    }
+    
+    .onboarding-container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding-top: 40px;
+    }
+    
+    .onboarding-title {
+        font-size: 28px;
+        font-weight: 700;
+        text-align: center;
+    }
+    
+    .onboarding-subtitle {
+        text-align: center;
+        color: var(--text-secondary);
+        margin-bottom: 32px;
+    }
+    
+    .user-type-selection {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    
+    .type-card {
+        background: white;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px 16px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .type-card:hover {
+        border-color: var(--primary);
+    }
+    
+    .type-card.selected {
+        border-color: var(--primary);
+        background: #EEF2FF;
+    }
+    
+    .type-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 12px;
+    }
+    
+    .type-icon.business {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+    }
+    
+    .type-icon.creator {
+        background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
+        color: white;
+    }
+    
+    .type-card h3 {
+        font-size: 16px;
+        margin-bottom: 4px;
+    }
+    
+    .type-card p {
+        font-size: 12px;
+        color: var(--text-secondary);
+    }
+    
+    .profile-form {
+        background: white;
+        padding: 20px;
+        border-radius: var(--radius);
+        margin-bottom: 16px;
+    }
+    
+    .alert-error {
+        background: #FEE2E2;
+        color: var(--error);
+        padding: 12px;
+        border-radius: var(--radius-sm);
+        margin-bottom: 16px;
+    }
+</style>
+
+@code {
+    private UserType? _selectedType;
+    private string? _fullName;
+    private string? _location;
+    private string? _phone;
+    private string? _errorMessage;
+    private bool _isLoading;
+
+    private void SelectType(UserType type)
+    {
+        _selectedType = type;
+    }
+
+    private async Task HandleContinue()
+    {
+        if (!_selectedType.HasValue) return;
+
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var firebaseUid = AuthService.GetCurrentUserId();
+            if (string.IsNullOrEmpty(firebaseUid))
+            {
+                _errorMessage = "Session expired. Please login again.";
+                return;
+            }
+
+            var registerDto = new RegisterUserDto
+            {
+                FirebaseUid = firebaseUid,
+                Email = "", // Will be filled from Firebase
+                FullName = _fullName ?? "",
+                UserType = _selectedType.Value,
+                Location = _location,
+                Phone = _phone
+            };
+
+            var result = await ApiService.RegisterUserAsync(registerDto);
+            if (result.Success)
+            {
+                var route = _selectedType == UserType.Business 
+                    ? "/business/home" 
+                    : "/creator/profile/setup";
+                Navigation.NavigateTo(route);
+            }
+            else
+            {
+                _errorMessage = result.Message ?? "Failed to create profile";
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

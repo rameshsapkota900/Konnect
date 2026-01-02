@@ -1,0 +1,197 @@
+@page "/profile"
+@inject IApiService ApiService
+@inject IFirebaseAuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="header">
+    <h1 class="header-title">Profile</h1>
+</div>
+
+<div class="page-content">
+    @if (_user != null)
+    {
+        <!-- Profile Header -->
+        <div class="profile-header">
+            <div class="avatar avatar-lg">
+                @if (!string.IsNullOrEmpty(_user.ProfileImageUrl))
+                {
+                    <img src="@_user.ProfileImageUrl" alt="@_user.FullName" />
+                }
+                else
+                {
+                    @(_user.FullName?.FirstOrDefault())
+                }
+            </div>
+            <h2>@_user.FullName</h2>
+            <p class="text-secondary">@_user.Location</p>
+            <span class="tag">@_user.UserType</span>
+        </div>
+
+        @if (_user.UserType == UserType.Creator && _creatorProfile != null)
+        {
+            <!-- Creator Stats -->
+            <div class="card">
+                <div class="stats-row">
+                    <div class="stat-item">
+                        <span class="stat-value">@FormatNumber(_creatorProfile.FollowersCount)</span>
+                        <span class="stat-label">Followers</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">@(_creatorProfile.EngagementRate?.ToString("0.0"))%</span>
+                        <span class="stat-label">Engagement</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">Rs @_creatorProfile.HourlyRate</span>
+                        <span class="stat-label">Rate</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bio -->
+            @if (!string.IsNullOrEmpty(_creatorProfile.Bio))
+            {
+                <div class="card">
+                    <h3 class="card-title">About</h3>
+                    <p>@_creatorProfile.Bio</p>
+                </div>
+            }
+
+            <!-- Social Links -->
+            <div class="card">
+                <h3 class="card-title">Social Media</h3>
+                <div class="social-links">
+                    @if (!string.IsNullOrEmpty(_creatorProfile.InstagramUrl))
+                    {
+                        <a href="@_creatorProfile.InstagramUrl" class="social-link instagram">
+                            Instagram
+                        </a>
+                    }
+                    @if (!string.IsNullOrEmpty(_creatorProfile.TikTokUrl))
+                    {
+                        <a href="@_creatorProfile.TikTokUrl" class="social-link tiktok">
+                            TikTok
+                        </a>
+                    }
+                    @if (!string.IsNullOrEmpty(_creatorProfile.YouTubeUrl))
+                    {
+                        <a href="@_creatorProfile.YouTubeUrl" class="social-link youtube">
+                            YouTube
+                        </a>
+                    }
+                </div>
+            </div>
+
+            <!-- Niches -->
+            @if (_creatorProfile.Niches.Any())
+            {
+                <div class="card">
+                    <h3 class="card-title">Niches</h3>
+                    <div class="niches">
+                        @foreach (var niche in _creatorProfile.Niches)
+                        {
+                            <span class="tag tag-outline">@niche</span>
+                        }
+                    </div>
+                </div>
+            }
+        }
+
+        <!-- Actions -->
+        <div class="profile-actions">
+            <button class="btn btn-outline btn-full" @onclick="EditProfile">
+                Edit Profile
+            </button>
+            <button class="btn btn-full" style="background: var(--error); color: white;" @onclick="Logout">
+                Logout
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="loading">Loading profile...</div>
+    }
+</div>
+
+<style>
+    .profile-header {
+        text-align: center;
+        padding: 24px;
+        background: white;
+        border-radius: var(--radius);
+        margin-bottom: 16px;
+        box-shadow: var(--shadow);
+    }
+    
+    .profile-header h2 { margin: 12px 0 4px; }
+    .profile-header .tag { margin-top: 8px; }
+    
+    .social-links { display: flex; flex-direction: column; gap: 8px; }
+    
+    .social-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: var(--background);
+        border-radius: var(--radius-sm);
+        text-decoration: none;
+        color: var(--text-primary);
+    }
+    
+    .social-link.instagram { border-left: 3px solid #E1306C; }
+    .social-link.tiktok { border-left: 3px solid #000; }
+    .social-link.youtube { border-left: 3px solid #FF0000; }
+    
+    .niches { display: flex; flex-wrap: wrap; gap: 8px; }
+    
+    .profile-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 24px;
+        padding-bottom: 100px;
+    }
+    
+    .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+</style>
+
+@code {
+    private UserDto? _user;
+    private CreatorProfileDto? _creatorProfile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userResult = await ApiService.GetCurrentUserAsync();
+        if (userResult.Success)
+        {
+            _user = userResult.Data;
+            
+            if (_user?.UserType == UserType.Creator)
+            {
+                var profileResult = await ApiService.GetCreatorProfileAsync(_user.Id);
+                if (profileResult.Success)
+                {
+                    _creatorProfile = profileResult.Data;
+                }
+            }
+        }
+    }
+
+    private void EditProfile()
+    {
+        Navigation.NavigateTo("/profile/edit");
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.SignOutAsync();
+        Navigation.NavigateTo("/login");
+    }
+
+    private static string FormatNumber(int num) => num switch
+    {
+        >= 1000000 => $"{num / 1000000.0:0.#}M",
+        >= 1000 => $"{num / 1000.0:0.#}K",
+        _ => num.ToString()
+    };
+}

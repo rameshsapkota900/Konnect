@@ -1,0 +1,240 @@
+@page "/payment/{DealId:guid}"
+@inject IEsewaPaymentService PaymentService
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+
+<div class="header">
+    <h1 class="header-title">Payment</h1>
+</div>
+
+<div class="page-content">
+    @if (_isLoading)
+    {
+        <div class="loading">Loading deal details...</div>
+    }
+    else if (_deal != null)
+    {
+        <div class="card payment-summary">
+            <h2>Payment Summary</h2>
+            
+            <div class="summary-row">
+                <span>Campaign</span>
+                <span>@_deal.Campaign?.Title</span>
+            </div>
+            
+            <div class="summary-row">
+                <span>Creator</span>
+                <span>@_deal.Creator?.FullName</span>
+            </div>
+            
+            <div class="summary-row total">
+                <span>Amount</span>
+                <span class="amount">Rs @_deal.AgreedPrice</span>
+            </div>
+        </div>
+
+        <div class="card payment-info">
+            <h3>🔒 Secure Escrow Payment</h3>
+            <p>Your payment will be held securely until you approve the creator's work.</p>
+            <ul>
+                <li>✓ Money held safely in escrow</li>
+                <li>✓ Released only after your approval</li>
+                <li>✓ Full refund if work not delivered</li>
+            </ul>
+        </div>
+
+        <div class="payment-method">
+            <h3>Pay with</h3>
+            <button class="esewa-btn" @onclick="PayWithEsewa" disabled="@_isProcessing">
+                <img src="https://esewa.com.np/common/images/esewa-logo.png" alt="eSewa" />
+                @if (_isProcessing)
+                {
+                    <span>Processing...</span>
+                }
+                else
+                {
+                    <span>Pay with eSewa</span>
+                }
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-error">@_errorMessage</div>
+        }
+
+        <p class="test-info">
+            <strong>Test Credentials:</strong><br/>
+            eSewa ID: 9806800001<br/>
+            Password: Nepal@123<br/>
+            MPIN: 1122
+        </p>
+    }
+    else
+    {
+        <div class="empty-state">
+            <p>Deal not found</p>
+        </div>
+    }
+</div>
+
+<style>
+    .payment-summary {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+    }
+    
+    .payment-summary h2 {
+        margin-bottom: 16px;
+        font-size: 18px;
+    }
+    
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .summary-row.total {
+        border-bottom: none;
+        padding-top: 16px;
+        font-weight: 600;
+    }
+    
+    .amount {
+        font-size: 24px;
+        font-weight: 700;
+    }
+    
+    .payment-info {
+        background: #F0FDF4;
+        border-left: 4px solid var(--secondary);
+    }
+    
+    .payment-info h3 {
+        color: var(--secondary-dark);
+        margin-bottom: 8px;
+    }
+    
+    .payment-info ul {
+        margin: 12px 0 0;
+        padding-left: 0;
+        list-style: none;
+    }
+    
+    .payment-info li {
+        padding: 4px 0;
+        color: var(--text-secondary);
+    }
+    
+    .payment-method {
+        margin: 24px 0;
+    }
+    
+    .payment-method h3 {
+        margin-bottom: 12px;
+        color: var(--text-secondary);
+    }
+    
+    .esewa-btn {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 16px;
+        background: #60BB46;
+        color: white;
+        border: none;
+        border-radius: var(--radius);
+        font-size: 18px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    
+    .esewa-btn img {
+        height: 32px;
+        background: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+    
+    .esewa-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+    
+    .alert-error {
+        background: #FEE2E2;
+        color: var(--error);
+        padding: 12px;
+        border-radius: var(--radius-sm);
+        margin-top: 16px;
+    }
+    
+    .test-info {
+        margin-top: 24px;
+        padding: 16px;
+        background: #FEF3C7;
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        color: #92400E;
+    }
+    
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: var(--text-secondary);
+    }
+</style>
+
+@code {
+    [Parameter] public Guid DealId { get; set; }
+    
+    private DealDto? _deal;
+    private bool _isLoading = true;
+    private bool _isProcessing;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await ApiService.GetDealAsync(DealId);
+        if (result.Success)
+        {
+            _deal = result.Data;
+        }
+        _isLoading = false;
+    }
+
+    private async Task PayWithEsewa()
+    {
+        if (_deal == null) return;
+        
+        _isProcessing = true;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await PaymentService.InitiatePaymentAsync(DealId, _deal.AgreedPrice);
+            
+            if (result.Success && !string.IsNullOrEmpty(result.PaymentUrl))
+            {
+                // Open eSewa payment page in browser
+                await Browser.Default.OpenAsync(result.PaymentUrl, BrowserLaunchMode.SystemPreferred);
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage ?? "Failed to initiate payment";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+}

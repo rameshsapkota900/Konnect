@@ -1,0 +1,36 @@
+# Firebase Admin SDK - NEVER commit this!
+firebase-admin-sdk.json
+**/firebase-admin-sdk.json
+**/google-services.json
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.csproj.user
+
+# MAUI
+*.apk
+*.aab
+*.ipa
+
+# Secrets - NEVER commit these!
+appsettings.json
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Local.json
+**/appsettings.json
+
+# IDE
+.idea/
+*.swp
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

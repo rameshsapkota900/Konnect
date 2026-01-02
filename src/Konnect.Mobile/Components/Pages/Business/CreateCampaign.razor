@@ -1,0 +1,135 @@
+@page "/business/campaigns/create"
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+
+<div class="header">
+    <h1 class="header-title">Create Campaign</h1>
+</div>
+
+<div class="page-content">
+    <EditForm Model="@_model" OnValidSubmit="HandleSubmit">
+        <div class="card">
+            <div class="form-group">
+                <label class="form-label">Campaign Title</label>
+                <input type="text" class="form-input" @bind="_model.Title" 
+                       placeholder="e.g., Restaurant Review Video" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea class="form-input" rows="4" @bind="_model.Description" 
+                          placeholder="Describe what you're looking for..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Budget (NPR)</label>
+                <input type="number" class="form-input" @bind="_model.Budget" 
+                       placeholder="5000" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Deadline</label>
+                <input type="date" class="form-input" @bind="_model.Deadline" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Niche</label>
+                <select class="form-input" @bind="_model.Niche">
+                    @foreach (var niche in Enum.GetValues<Niche>())
+                    {
+                        <option value="@niche">@niche</option>
+                    }
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Deliverables</label>
+                <div class="deliverables-list">
+                    @foreach (var (item, index) in _model.Deliverables.Select((v, i) => (v, i)))
+                    {
+                        <div class="deliverable-item">
+                            <input type="text" class="form-input" value="@item" 
+                                   @onchange="e => UpdateDeliverable(index, e.Value?.ToString())" />
+                            <button type="button" class="btn-icon" @onclick="() => RemoveDeliverable(index)">×</button>
+                        </div>
+                    }
+                </div>
+                <button type="button" class="btn btn-outline" @onclick="AddDeliverable">
+                    + Add Deliverable
+                </button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-error">@_errorMessage</div>
+        }
+
+        <button type="submit" class="btn btn-primary btn-full mt-2" disabled="@_isLoading">
+            @(_isLoading ? "Creating..." : "Create Campaign")
+        </button>
+    </EditForm>
+</div>
+
+<style>
+    .deliverables-list { margin-bottom: 12px; }
+    .deliverable-item { display: flex; gap: 8px; margin-bottom: 8px; }
+    .deliverable-item .form-input { flex: 1; }
+    .btn-icon { 
+        width: 40px; 
+        background: var(--error); 
+        color: white; 
+        border: none; 
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+    }
+    .alert-error { background: #FEE2E2; color: var(--error); padding: 12px; border-radius: var(--radius-sm); margin-top: 16px; }
+</style>
+
+@code {
+    private CreateCampaignDto _model = new() { Deliverables = new List<string> { "" } };
+    private string? _errorMessage;
+    private bool _isLoading;
+
+    private void AddDeliverable()
+    {
+        _model.Deliverables.Add("");
+    }
+
+    private void RemoveDeliverable(int index)
+    {
+        if (_model.Deliverables.Count > 1)
+            _model.Deliverables.RemoveAt(index);
+    }
+
+    private void UpdateDeliverable(int index, string? value)
+    {
+        if (index < _model.Deliverables.Count)
+            _model.Deliverables[index] = value ?? "";
+    }
+
+    private async Task HandleSubmit()
+    {
+        _errorMessage = null;
+        _isLoading = true;
+
+        try
+        {
+            _model.Deliverables = _model.Deliverables.Where(d => !string.IsNullOrWhiteSpace(d)).ToList();
+            
+            var result = await ApiService.CreateCampaignAsync(_model);
+            if (result.Success)
+            {
+                Navigation.NavigateTo("/business/campaigns");
+            }
+            else
+            {
+                _errorMessage = result.Message ?? "Failed to create campaign";
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

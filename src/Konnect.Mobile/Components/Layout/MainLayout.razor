@@ -1,0 +1,33 @@
+@inherits LayoutComponentBase
+@inject IFirebaseAuthService AuthService
+
+<div class="page">
+    @Body
+    
+    @if (_showNav)
+    {
+        <BottomNavigation UserType="@_userType" />
+    }
+</div>
+
+@code {
+    private bool _showNav = false;
+    private UserType _userType = UserType.Creator;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _showNav = await AuthService.IsAuthenticatedAsync();
+        AuthService.AuthStateChanged += OnAuthStateChanged;
+    }
+
+    private void OnAuthStateChanged(object? sender, AuthStateChangedEventArgs e)
+    {
+        _showNav = e.IsAuthenticated;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthStateChanged -= OnAuthStateChanged;
+    }
+}

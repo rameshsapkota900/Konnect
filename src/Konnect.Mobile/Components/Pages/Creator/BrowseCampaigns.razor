@@ -1,0 +1,198 @@
+@page "/creator/campaigns"
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+
+<div class="header">
+    <h1 class="header-title">Browse Campaigns</h1>
+</div>
+
+<div class="page-content">
+    <!-- Filters -->
+    <div class="filter-chips">
+        @foreach (var niche in _niches)
+        {
+            <button class="chip @(_selectedNiche == niche ? "active" : "")" 
+                    @onclick="() => FilterByNiche(niche)">
+                @niche.ToString()
+            </button>
+        }
+    </div>
+
+    <!-- Campaigns List -->
+    @if (_isLoading)
+    {
+        <div class="loading">Loading campaigns...</div>
+    }
+    else if (_campaigns.Any())
+    {
+        @foreach (var campaign in _campaigns)
+        {
+            <div class="card campaign-card" @onclick="() => ViewCampaign(campaign.Id)">
+                <div class="campaign-header">
+                    <span class="tag">@campaign.Niche</span>
+                    <span class="campaign-budget">Rs @campaign.Budget</span>
+                </div>
+                
+                <h3 class="campaign-title">@campaign.Title</h3>
+                <p class="campaign-desc">@(campaign.Description.Length > 120 ? campaign.Description[..120] + "..." : campaign.Description)</p>
+                
+                <div class="campaign-meta">
+                    <div class="business-info">
+                        <div class="avatar" style="width:32px;height:32px;font-size:14px;">
+                            @(campaign.Business?.FullName?.FirstOrDefault())
+                        </div>
+                        <span>@campaign.Business?.FullName</span>
+                    </div>
+                    @if (campaign.Deadline.HasValue)
+                    {
+                        <span class="deadline">Due @campaign.Deadline.Value.ToString("MMM dd")</span>
+                    }
+                </div>
+                
+                @if (campaign.Deliverables.Any())
+                {
+                    <div class="deliverables">
+                        <strong>Deliverables:</strong>
+                        <ul>
+                            @foreach (var item in campaign.Deliverables.Take(3))
+                            {
+                                <li>@item</li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <p>No campaigns found</p>
+        </div>
+    }
+</div>
+
+<style>
+    .filter-chips {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 0 0 16px;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .chip {
+        padding: 8px 16px;
+        border-radius: 20px;
+        border: 1px solid var(--border);
+        background: white;
+        font-size: 14px;
+        white-space: nowrap;
+        cursor: pointer;
+    }
+    
+    .chip.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+    
+    .campaign-card { cursor: pointer; }
+    
+    .campaign-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+    
+    .campaign-budget {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--secondary);
+    }
+    
+    .campaign-title {
+        font-size: 18px;
+        margin-bottom: 8px;
+    }
+    
+    .campaign-desc {
+        color: var(--text-secondary);
+        font-size: 14px;
+        margin-bottom: 12px;
+    }
+    
+    .campaign-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+    }
+    
+    .business-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+    }
+    
+    .deadline {
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+    
+    .deliverables {
+        margin-top: 12px;
+        font-size: 14px;
+        color: var(--text-secondary);
+    }
+    
+    .deliverables ul {
+        margin: 4px 0 0 20px;
+        padding: 0;
+    }
+    
+    .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+</style>
+
+@code {
+    private List<CampaignDto> _campaigns = new();
+    private Niche? _selectedNiche;
+    private bool _isLoading = true;
+    private readonly Niche[] _niches = Enum.GetValues<Niche>().Take(8).ToArray();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCampaigns();
+    }
+
+    private async Task LoadCampaigns()
+    {
+        _isLoading = true;
+        var filter = new CampaignFilterDto
+        {
+            Niche = _selectedNiche,
+            PageSize = 20
+        };
+        
+        var result = await ApiService.GetCampaignsAsync(filter);
+        if (result.Success && result.Data != null)
+        {
+            _campaigns = result.Data.Items;
+        }
+        _isLoading = false;
+    }
+
+    private async Task FilterByNiche(Niche niche)
+    {
+        _selectedNiche = _selectedNiche == niche ? null : niche;
+        await LoadCampaigns();
+    }
+
+    private void ViewCampaign(Guid campaignId)
+    {
+        Navigation.NavigateTo($"/campaigns/{campaignId}");
+    }
+}

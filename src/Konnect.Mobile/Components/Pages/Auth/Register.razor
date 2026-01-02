@@ -1,0 +1,137 @@
+@page "/register"
+@inject IFirebaseAuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="page auth-page">
+    <div class="auth-container">
+        <div class="auth-logo">
+            <h1 class="auth-title">Create Account</h1>
+            <p class="auth-subtitle">Join Konnect today</p>
+        </div>
+
+        <EditForm Model="@_model" OnValidSubmit="HandleRegister" class="auth-form">
+            <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input type="text" class="form-input" @bind="_model.FullName" placeholder="John Doe" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-input @(_errors.ContainsKey("email") ? "error" : "")" 
+                       @bind="_model.Email" placeholder="your@email.com" />
+                @if (_errors.ContainsKey("email"))
+                {
+                    <span class="form-error">@_errors["email"]</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" class="form-input @(_errors.ContainsKey("password") ? "error" : "")" 
+                       @bind="_model.Password" placeholder="Min 6 characters" />
+                @if (_errors.ContainsKey("password"))
+                {
+                    <span class="form-error">@_errors["password"]</span>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Confirm Password</label>
+                <input type="password" class="form-input @(_errors.ContainsKey("confirmPassword") ? "error" : "")" 
+                       @bind="_model.ConfirmPassword" placeholder="••••••••" />
+                @if (_errors.ContainsKey("confirmPassword"))
+                {
+                    <span class="form-error">@_errors["confirmPassword"]</span>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="alert alert-error">@_errorMessage</div>
+            }
+
+            <button type="submit" class="btn btn-primary btn-full" disabled="@_isLoading">
+                @if (_isLoading)
+                {
+                    <span>Creating account...</span>
+                }
+                else
+                {
+                    <span>Create Account</span>
+                }
+            </button>
+        </EditForm>
+
+        <p class="auth-footer">
+            Already have an account? <a href="/login">Sign In</a>
+        </p>
+    </div>
+</div>
+
+<style>
+    .auth-page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px;
+        background: linear-gradient(180deg, #F9FAFB 0%, #EEF2FF 100%);
+    }
+    
+    .auth-container { width: 100%; max-width: 400px; }
+    .auth-logo { text-align: center; margin-bottom: 32px; }
+    .auth-title { font-size: 28px; font-weight: 700; color: var(--text-primary); }
+    .auth-subtitle { color: var(--text-secondary); margin-top: 8px; }
+    .auth-form { background: white; padding: 24px; border-radius: var(--radius); box-shadow: var(--shadow-lg); }
+    .auth-footer { text-align: center; margin-top: 24px; color: var(--text-secondary); }
+    .auth-footer a { color: var(--primary); font-weight: 500; text-decoration: none; }
+    .alert-error { background: #FEE2E2; color: var(--error); padding: 12px; border-radius: var(--radius-sm); margin-bottom: 16px; }
+</style>
+
+@code {
+    private RegisterModel _model = new();
+    private Dictionary<string, string> _errors = new();
+    private string? _errorMessage;
+    private bool _isLoading;
+
+    private async Task HandleRegister()
+    {
+        _errors.Clear();
+        _errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(_model.Email))
+            _errors["email"] = "Email is required";
+        if (string.IsNullOrWhiteSpace(_model.Password) || _model.Password.Length < 6)
+            _errors["password"] = "Password must be at least 6 characters";
+        if (_model.Password != _model.ConfirmPassword)
+            _errors["confirmPassword"] = "Passwords do not match";
+
+        if (_errors.Any()) return;
+
+        _isLoading = true;
+        try
+        {
+            var result = await AuthService.SignUpWithEmailAsync(_model.Email!, _model.Password!);
+            if (result.Success)
+            {
+                Navigation.NavigateTo("/onboarding");
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private class RegisterModel
+    {
+        public string? FullName { get; set; }
+        public string? Email { get; set; }
+        public string? Password { get; set; }
+        public string? ConfirmPassword { get; set; }
+    }
+}

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Konnect</title>
+    <base href="/" />
+    <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+    <div class="status-bar-safe-area"></div>
+    <div id="app">
+        <div class="loading-screen">
+            <svg class="loading-logo" viewBox="0 0 100 100" width="80" height="80">
+                <defs>
+                    <linearGradient id="loadGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#6366F1"/>
+                        <stop offset="100%" style="stop-color:#8B5CF6"/>
+                    </linearGradient>
+                </defs>
+                <circle cx="50" cy="50" r="45" fill="url(#loadGrad)"/>
+            </svg>
+            <p>Loading...</p>
+        </div>
+    </div>
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
+</body>
+</html>
