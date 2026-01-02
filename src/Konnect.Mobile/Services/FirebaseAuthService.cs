@@ -76,9 +76,9 @@ public class FirebaseAuthService : IFirebaseAuthService
     {
         try
         {
-            _currentUser = await _authClient.SignInWithRedirectAsync(FirebaseProviderType.Google);
-            var token = await _currentUser.User.GetIdTokenAsync();
-            return AuthResult.Ok(_currentUser.User.Uid, _currentUser.User.Info.Email, token);
+            // Google sign-in requires platform-specific implementation
+            // For now, return error - implement with MAUI Essentials WebAuthenticator
+            return AuthResult.Fail("Google sign-in not yet implemented. Please use email/password.");
         }
         catch (Exception ex)
         {

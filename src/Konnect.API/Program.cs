@@ -26,13 +26,40 @@ builder.Services.AddStackExchangeRedisCache(options =>
 
 // Firebase Admin SDK
 var firebaseCredential = Environment.GetEnvironmentVariable("FIREBASE_CREDENTIALS");
-if (!string.IsNullOrEmpty(firebaseCredential))
+var firebaseCredentialBase64 = Environment.GetEnvironmentVariable("FIREBASE_CREDENTIALS_BASE64");
+
+if (!string.IsNullOrEmpty(firebaseCredentialBase64))
 {
-    // Use credentials from environment variable
-    FirebaseApp.Create(new AppOptions
+    // Decode Base64 encoded credentials (recommended for production)
+    try
     {
-        Credential = GoogleCredential.FromJson(firebaseCredential)
-    });
+        var jsonCredential = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(firebaseCredentialBase64));
+        FirebaseApp.Create(new AppOptions
+        {
+            Credential = GoogleCredential.FromJson(jsonCredential)
+        });
+        Console.WriteLine("Firebase Admin SDK initialized from Base64 credentials.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Warning: Failed to decode Firebase credentials: {ex.Message}");
+    }
+}
+else if (!string.IsNullOrEmpty(firebaseCredential))
+{
+    // Use raw JSON credentials from environment variable
+    try
+    {
+        FirebaseApp.Create(new AppOptions
+        {
+            Credential = GoogleCredential.FromJson(firebaseCredential)
+        });
+        Console.WriteLine("Firebase Admin SDK initialized from JSON credentials.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Warning: Failed to parse Firebase credentials: {ex.Message}");
+    }
 }
 else if (File.Exists("firebase-admin-sdk.json"))
 {
@@ -41,6 +68,7 @@ else if (File.Exists("firebase-admin-sdk.json"))
     {
         Credential = GoogleCredential.FromFile("firebase-admin-sdk.json")
     });
+    Console.WriteLine("Firebase Admin SDK initialized from local file.");
 }
 else
 {

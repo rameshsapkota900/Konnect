@@ -1,4 +1,5 @@
 @page "/chat"
+@using Konnect.Mobile.Services
 @inject IFirebaseChatService ChatService
 @inject IFirebaseAuthService AuthService
 @inject NavigationManager Navigation
@@ -21,7 +22,7 @@
                     @(GetOtherParticipantInitial(chat))
                 </div>
                 <div class="chat-info">
-                    <div class="chat-header">
+                    <div class="chat-header-row">
                         <span class="chat-name">@GetOtherParticipantName(chat)</span>
                         <span class="chat-time">@FormatTime(chat.LastMessage?.Timestamp)</span>
                     </div>
@@ -63,7 +64,7 @@
     
     .chat-info { flex: 1; min-width: 0; }
     
-    .chat-header {
+    .chat-header-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -96,7 +97,7 @@
 </style>
 
 @code {
-    private List<ChatRoom> _chats = new();
+    private List<Services.ChatRoom> _chats = new();
     private bool _isLoading = true;
     private string? _currentUserId;
 
@@ -115,15 +116,14 @@
         Navigation.NavigateTo($"/chat/{chatId}");
     }
 
-    private string GetOtherParticipantInitial(ChatRoom chat)
+    private string GetOtherParticipantInitial(Services.ChatRoom chat)
     {
         var otherId = chat.Participants.FirstOrDefault(p => p != _currentUserId);
         return otherId?.FirstOrDefault().ToString().ToUpper() ?? "?";
     }
 
-    private string GetOtherParticipantName(ChatRoom chat)
+    private string GetOtherParticipantName(Services.ChatRoom chat)
     {
-        // In real app, you'd fetch user names
         return "Chat Partner";
     }
 

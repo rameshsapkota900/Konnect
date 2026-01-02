@@ -1,6 +1,5 @@
 using CommunityToolkit.Maui;
 using Konnect.Mobile.Services;
-using Microsoft.Extensions.Logging;
 
 namespace Konnect.Mobile;
 
@@ -22,7 +21,6 @@ public static class MauiProgram
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
-        builder.Logging.AddDebug();
 #endif
 
         // Register Services
