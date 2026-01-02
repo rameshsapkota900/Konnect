@@ -9,7 +9,7 @@ public static class AppConfig
     public const string FirebaseStorageBucket = "konnect-2c9ba.firebasestorage.app";
     
     // API Configuration
-    public const string ApiBaseUrl = "https://localhost:7001/api/"; // Update for production
+    public const string ApiBaseUrl = "https://konnect-n9so.onrender.com/api/";
     
     // eSewa Configuration
     public const string EsewaClientId = ""; // Add your eSewa client ID
