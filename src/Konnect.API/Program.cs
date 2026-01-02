@@ -25,10 +25,28 @@ builder.Services.AddStackExchangeRedisCache(options =>
 });
 
 // Firebase Admin SDK
-FirebaseApp.Create(new AppOptions
+var firebaseCredential = Environment.GetEnvironmentVariable("FIREBASE_CREDENTIALS");
+if (!string.IsNullOrEmpty(firebaseCredential))
 {
-    Credential = GoogleCredential.FromFile("firebase-admin-sdk.json")
-});
+    // Use credentials from environment variable
+    FirebaseApp.Create(new AppOptions
+    {
+        Credential = GoogleCredential.FromJson(firebaseCredential)
+    });
+}
+else if (File.Exists("firebase-admin-sdk.json"))
+{
+    // Use local file for development
+    FirebaseApp.Create(new AppOptions
+    {
+        Credential = GoogleCredential.FromFile("firebase-admin-sdk.json")
+    });
+}
+else
+{
+    // Skip Firebase Admin SDK initialization (auth still works via JWT)
+    Console.WriteLine("Warning: Firebase Admin SDK not configured. Some features may be limited.");
+}
 
 // Firebase Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
